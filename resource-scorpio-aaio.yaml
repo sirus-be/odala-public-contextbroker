@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scorpioapp
+  labels:
+    app: scorpioapp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scorpioapp
+  template:
+    metadata:
+      labels:
+        app: scorpioapp
+    spec:
+      containers:  
+      - name: scorpio
+        image: scorpiobroker/all-in-one-runner:java-kafka-3.0.9
+        resources:
+          limits:
+            memory: "2Gi"
+            cpu: "1.5"
+          requests:
+            memory: "500Mi"
+            cpu: ".5"
+        ports:
+          - containerPort: 9090
+            protocol: TCP
+        env:
+            - name: MYSETTINGS_POSTGRES_HOST
+              value: timescaledb.database.svc.cluster.local
+            - name: MYSETTINGS_POSTGRES_USERNAME
+              value: +POSTGRESUSER+
+            - name: MYSETTINGS_POSTGRES_PASSWORD
+              value: +POSTGRESPASSWORD+
+            - name: MYSETTINGS_POSTGRES_DATABASE_NAME
+              value: ngb
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: scorpioservice
+  labels:
+    app: scorpioapp
+    service: scorpioservice
+spec:
+  selector:
+    app: scorpioapp
+  ports:
+  - protocol: TCP
+    port: 9090
+    targetPort: 9090
+  type: ClusterIP

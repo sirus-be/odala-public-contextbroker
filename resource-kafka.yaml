@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+spec:
+  selector:
+    matchLabels:
+      component: kafka
+  replicas: 1
+  serviceName: kafka
+  template:
+    metadata:
+      labels:
+        component: kafka
+    spec:
+      containers:
+      - name: zookeeper
+        image: zookeeper:3.8.0
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: ".2"
+          requests:
+            memory: "500Mi"
+            cpu: ".2"
+        volumeMounts:
+        - name: zookeeper-storage
+          mountPath: /data
+        - name: zookeeper-datalog
+          mountPath: /datalog
+      - name: kafka 
+        image: bitnami/kafka:3.0.1
+        imagePullPolicy: IfNotPresent
+        ports:
+          - containerPort: 9092
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: ".2"
+          requests:
+            memory: "500Mi"
+            cpu: ".2"
+        env:
+          - name: KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS
+            value: "5000"
+          - name: JAVA_OPTS
+            value: "-Xms512m -Xmx1000m"
+          - name: KAFKA_ZOOKEEPER_CONNECT
+            value: "localhost:2181"
+          - name: ALLOW_PLAINTEXT_LISTENER
+            value: "yes"
+          - name: KAFKA_LOG_RETENTION_MS
+            value: "10000"
+          - name: KAFKA_ADVERTISED_PORT
+            value: "9092"
+          - name: KAFKA_ADVERTISED_HOST_NAME
+            value: "kafka"          
+          - name: KAFKA_PORT
+            value: "9092"          
+          - name: KAFKA_HEAP_OPTS
+            value: "-Xms512m -Xmx1000m"
+          - name: KAFKA_CFG_LOG_RETENTION_HOURS 
+            value: "1"
+        volumeMounts:
+        - name: kafka-storage
+          mountPath: /bitnami/kafka
+      hostname: kafka
+      restartPolicy: Always
+      serviceAccountName: ""
+  volumeClaimTemplates:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: kafka-storage
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: zookeeper-storage
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+      volumeMode: Filesystem
+    status:
+      phase: Pending
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: zookeeper-datalog
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 2Gi
+      volumeMode: Filesystem
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    component: kafka
+  name: kafka
+spec:
+  ports:
+  - name: "9092"
+    port: 9092
+    targetPort: 9092
+  selector:
+    component: kafka

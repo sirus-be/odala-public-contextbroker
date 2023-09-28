@@ -1,0 +1,55 @@
+# Copyright (C) Contrasec 2022
+#.gitlab-ci.yml
+
+# Deployment script
+
+.deploy_template: &deploy_template
+  #tags:
+  #  - kubernetes #Only runners with this tag are used
+  image: bitnami/kubectl:latest
+  stage: deploy
+  script:
+    - echo "$KUBE" > config  # Echo Kubeconfig to a file
+                             # so it can be used by kubectl
+    
+    # Replace DOMAIN and NAMESPACE placeholders in resource.yaml with staging or production values
+    - sed -i "s~+POSTGRESPASSWORD+~${POSTGRESPASSWORD}~g" resource-scorpio-aaio.yaml
+    - sed -i "s~+POSTGRESUSER+~${POSTGRESUSER}~g" resource-scorpio-aaio.yaml
+    
+    # Apply file into kubernetes with kubectl
+    - kubectl apply -f resource-kafka.yaml --namespace ${NAMESPACE} --kubeconfig config
+    - kubectl apply -f resource-scorpio-aaio.yaml --namespace ${NAMESPACE} --kubeconfig config
+
+# Stages
+  
+stages:
+  - deploy
+
+
+# Staging deployment stage
+
+do deploy staging:
+  <<: *deploy_template
+  variables:
+    NAMESPACE: odala-staging
+    KUBE: $KUBECONFIG                 # Get KUBECONFIG from Gitlab CI/CD variable
+    POSTGRESPASSWORD: $Contextbroker_Staging_Postgres_Password           # Get Contextbroker_Staging_Postgres_Password from Gitlab CI/CD variable
+    POSTGRESUSER: $Contextbroker_Staging_Postgres_Username           # Get Contextbroker_Staging_Postgres_Username from Gitlab CI/CD variable
+  only:
+    #- /^C./                           # Every branch that starts with C #################################################
+    - /^odala-staging./              # Only odala-staging              #################################################
+    
+
+# Production deployment stage
+
+do deploy prod:
+  <<: *deploy_template
+  variables:
+    NAMESPACE: odala-production
+    KUBE: $KUBECONFIG                 # Get KUBECONFIG from Gitlab CI/CD variable
+    POSTGRESPASSWORD: $Contextbroker_Production_Postgres_Password           # Get Contextbroker_Production_Postgres_Password from Gitlab CI/CD variable
+    POSTGRESUSER: $Contextbroker_Production_Postgres_Username           # Get Contextbroker_Production_Postgres_Username from Gitlab CI/CD variable
+  only:
+    #- /^R./                           # Every branch that starts with R #################################################
+    - odala-production               # Only odala-production           #################################################
+  when: manual                        # Require manual step in pipeline to deploy to prod. Remove if not needed
